@@ -1,0 +1,11 @@
+-cp src
+-cp test
+-cp modules/gd-builder/haxe
+-lib utest
+-lib heaps:git
+-main TestMain
+-js bin/test/test.js
+-D nodejs
+-D resourcesPath=res
+-D js-source-map
+-D source-map-content

@@ -1,0 +1,9 @@
+{
+  "name": "main",
+  "main": "Main",
+  "sourcePaths": ["src"],
+  "defines": ["antialiasing=4"],
+  "libs": ["heaps:git"],
+  "autoDiscoverModules": false,
+  "reactBuildRuntime": false
+}

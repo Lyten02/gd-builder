@@ -1,0 +1,32 @@
+[project]
+name = "haxe-builder"
+version = "1.0.0"
+description = "Haxe/Heaps Build System"
+requires-python = ">=3.9"
+dependencies = [
+    "click>=8.0",
+    "watchdog>=3.0",
+    "python-dotenv>=1.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[project.scripts]
+build = "builder.cli:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+markers = [
+    "integration: marks tests as integration tests (require Haxe)",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
