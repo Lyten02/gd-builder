@@ -1,4 +1,4 @@
-"""Project-specific lint rules for {{PROJECT_NAME}} (Haxe/Heaps + ECS + MVP).
+"""Project-specific lint rules for Test1234 (Haxe/Heaps + ECS + MVP).
 
 Catches common LLM hallucinations: Unity idioms, React/Browser APIs, h3d in a
 2D game, View↔World coupling, Domkit templates missing SRC, direct hxd.Key
