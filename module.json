@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Build orchestrator — owns build.py, hxml generator, lint/test commands. Bootstraps build/ from templates on enable; disable is a no-op.",
   "dependencies": [],
+  "marketplace": {
+    "displayName": "Game Dev Builder"
+  },
   "lifecycle": {
     "clones": [
       { "from": "templates/profiles/main.json", "to": "build/profiles/main.json", "ifMissing": true },
