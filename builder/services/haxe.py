@@ -37,7 +37,6 @@ class HaxeCompileResult:
     error_message: str = ""
 
 
-
 def _haxe_lib_name(lib: str) -> str:
     """Return the haxelib package name, dropping an optional hxml version suffix."""
     return lib.split(":", 1)[0].strip()
@@ -97,6 +96,7 @@ def collect_haxe_libs(config: ProjectConfig) -> list[str]:
         libs.insert(0, "heaps")
 
     return libs
+
 
 class HaxeCompiler:
     """Haxe compiler wrapper"""
@@ -179,6 +179,55 @@ class HaxeCompiler:
             lines.append(f"-D resourcesPath={path_for_project(self.config.res_dir, self.config.project_dir)}")
 
         output_file.write_text("\n".join(lines))
+        return output_file
+
+    def generate_test_hxml(self) -> Path:
+        """Generate .hxml configuration for project and module tests."""
+        output_file = self.config.build_dir / "test.hxml"
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        (self.config.bin_dir / "test").mkdir(parents=True, exist_ok=True)
+
+        lines = [
+            "# Auto-generated test build file",
+            f"# Project: {self.config.project_dir}",
+            "",
+        ]
+
+        for src_path in self.config.get_source_paths():
+            lines.append(f"-cp {path_for_project(src_path, self.config.project_dir)}")
+
+        project_test = self.config.project_dir / "test"
+        if project_test.exists():
+            lines.append(f"-cp {path_for_project(project_test, self.config.project_dir)}")
+
+        builder_haxe = self.config.modules_dir / "gd-builder" / "haxe"
+        if builder_haxe.exists():
+            lines.append(f"-cp {path_for_project(builder_haxe, self.config.project_dir)}")
+
+        if self.config.modules_dir.exists():
+            for module_dir in sorted(self.config.modules_dir.iterdir()):
+                test_dir = module_dir / "test"
+                if test_dir.exists():
+                    lines.append(f"-cp {path_for_project(test_dir, self.config.project_dir)}")
+
+        libs: list[str] = []
+        seen: set[str] = set()
+        _append_haxe_lib(libs, seen, "utest")
+        for lib in collect_haxe_libs(self.config):
+            _append_haxe_lib(libs, seen, lib)
+        for lib in libs:
+            lines.append(f"-lib {lib}")
+
+        lines.extend([
+            "-main TestMain",
+            f"-js {path_for_project(self.config.bin_dir / 'test' / 'test.js', self.config.project_dir)}",
+            "-D nodejs",
+            f"-D resourcesPath={path_for_project(self.config.res_dir, self.config.project_dir)}",
+            "-D js-source-map",
+            "-D source-map-content",
+        ])
+
+        output_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
         return output_file
 
     def compile(self, hxml_path: Path, use_server: bool = False) -> HaxeCompileResult:
@@ -342,13 +391,6 @@ def build_test(config: ProjectConfig) -> HaxeCompileResult:
     """Build tests"""
     log_step("Compiling tests...")
 
-    test_hxml = config.build_dir / "test.hxml"
-    if not test_hxml.exists():
-        return HaxeCompileResult(
-            success=False,
-            duration_ms=0,
-            error_message=f"test.hxml not found at {test_hxml}",
-        )
-
     compiler = HaxeCompiler(config)
+    test_hxml = compiler.generate_test_hxml()
     return compiler.compile(test_hxml)

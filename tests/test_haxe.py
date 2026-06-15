@@ -1,9 +1,7 @@
 """Tests for Haxe service"""
 
-import pytest
-from pathlib import Path
-
 from builder.services.haxe import HaxeCompiler
+from builder.commands.setup import _setup_haxe_libs
 
 
 class TestHaxeCompiler:
@@ -94,4 +92,64 @@ class TestHaxeCompiler:
             "-lib heaps:git",
             "-lib domkit",
             "-lib deepnightLibs",
+        ]
+
+    def test_generate_test_hxml_includes_project_and_module_tests(
+        self, mock_config, temp_project_dir
+    ):
+        """Test test.hxml covers project tests, module tests, and declared libs."""
+        profile_dir = temp_project_dir / "build" / "profiles"
+        profile_dir.mkdir(parents=True)
+        (profile_dir / "main.json").write_text(
+            '{"libs": ["heaps:git", "domkit"]}',
+            encoding="utf-8",
+        )
+
+        (temp_project_dir / "test").mkdir()
+        module_dir = temp_project_dir / "modules" / "testmodule"
+        (module_dir / "src").mkdir(parents=True)
+        (module_dir / "test").mkdir()
+        (module_dir / "module.json").write_text(
+            '{"libs": ["deepnightLibs"]}',
+            encoding="utf-8",
+        )
+        builder_haxe = temp_project_dir / "modules" / "gd-builder" / "haxe"
+        builder_haxe.mkdir(parents=True)
+
+        compiler = HaxeCompiler(mock_config)
+        hxml_path = compiler.generate_test_hxml()
+
+        lines = hxml_path.read_text().splitlines()
+        assert f"-cp {str((temp_project_dir / 'src').relative_to(temp_project_dir))}" in lines
+        assert "-cp test" in lines
+        assert f"-cp {str(builder_haxe.relative_to(temp_project_dir))}" in lines
+        assert f"-cp {str((module_dir / 'test').relative_to(temp_project_dir))}" in lines
+        assert "-lib utest" in lines
+        assert "-lib heaps:git" in lines
+        assert "-lib domkit" in lines
+        assert "-lib deepnightLibs" in lines
+
+    def test_setup_haxe_libs_installs_profile_and_module_libs(
+        self, mock_config, temp_project_dir
+    ):
+        """Test setup installs normalized package names for declared haxelibs."""
+        profile_dir = temp_project_dir / "build" / "profiles"
+        profile_dir.mkdir(parents=True)
+        (profile_dir / "main.json").write_text(
+            '{"libs": ["heaps:git", "domkit"]}',
+            encoding="utf-8",
+        )
+
+        module_dir = temp_project_dir / "modules" / "testmodule"
+        module_dir.mkdir()
+        (module_dir / "module.json").write_text(
+            '{"libs": ["heaps", "deepnightLibs"]}',
+            encoding="utf-8",
+        )
+
+        assert _setup_haxe_libs(mock_config) == [
+            "heaps",
+            "domkit",
+            "deepnightLibs",
+            "utest",
         ]

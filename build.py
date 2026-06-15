@@ -202,10 +202,7 @@ def _test_cmd(ctx, module_name, project_only, ai_output, verbose):
     import json
     import subprocess
     config = ProjectConfig.from_project_root(Path(ctx.obj.get("project_dir")) if ctx.obj.get("project_dir") else None)
-    test_hxml = config.build_dir / "test.hxml"
-    if not test_hxml.exists():
-        sys.stderr.write(f"[ERROR] test.hxml not found at {test_hxml}\n")
-        ctx.exit(2)
+    test_hxml = _HaxeCompiler(config).generate_test_hxml()
 
     haxe_cmd = ["haxe", str(test_hxml)]
     if module_name:
