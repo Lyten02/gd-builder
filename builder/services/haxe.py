@@ -1,5 +1,6 @@
 """Haxe compiler wrapper and .hxml generation"""
 
+import json
 import socket
 import time
 from pathlib import Path
@@ -36,6 +37,67 @@ class HaxeCompileResult:
     error_message: str = ""
 
 
+
+def _haxe_lib_name(lib: str) -> str:
+    """Return the haxelib package name, dropping an optional hxml version suffix."""
+    return lib.split(":", 1)[0].strip()
+
+
+def _append_haxe_lib(libs: list[str], seen: set[str], raw_lib: object) -> None:
+    if not isinstance(raw_lib, str):
+        return
+
+    lib = raw_lib.strip()
+    if not lib:
+        return
+
+    name = _haxe_lib_name(lib)
+    if not name or name in seen:
+        return
+
+    libs.append(lib)
+    seen.add(name)
+
+
+def _read_haxe_libs(path: Path) -> list[str]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return []
+
+    if not isinstance(data, dict):
+        return []
+
+    raw_libs = data.get("libs", [])
+    if not isinstance(raw_libs, list):
+        return []
+
+    libs: list[str] = []
+    seen: set[str] = set()
+    for raw_lib in raw_libs:
+        _append_haxe_lib(libs, seen, raw_lib)
+    return libs
+
+
+def collect_haxe_libs(config: ProjectConfig) -> list[str]:
+    """Collect haxelibs from the project profile and enabled modules."""
+    libs: list[str] = []
+    seen: set[str] = set()
+
+    profile = config.build_dir / "profiles" / "main.json"
+    for lib in _read_haxe_libs(profile):
+        _append_haxe_lib(libs, seen, lib)
+
+    if config.modules_dir.exists():
+        for module_json in sorted(config.modules_dir.glob("*/module.json")):
+            for lib in _read_haxe_libs(module_json):
+                _append_haxe_lib(libs, seen, lib)
+
+    if "heaps" not in seen:
+        libs.insert(0, "heaps")
+
+    return libs
+
 class HaxeCompiler:
     """Haxe compiler wrapper"""
 
@@ -64,10 +126,9 @@ class HaxeCompiler:
         for src_path in self.config.get_source_paths():
             lines.append(f"-cp {path_for_project(src_path, self.config.project_dir)}")
 
-        lines.extend([
-            f"-main {self.config.get_main_class()}",
-            "-lib heaps",
-        ])
+        lines.append(f"-main {self.config.get_main_class()}")
+        for lib in collect_haxe_libs(self.config):
+            lines.append(f"-lib {lib}")
 
         # Platform-specific settings
         if platform == "web":
@@ -100,7 +161,6 @@ class HaxeCompiler:
 
         elif platform == "cpp":
             lines.extend([
-                "-lib heaps",
                 "-lib hlsdl",
                 "-lib hlopenal",
                 "-lib ldtk-haxe-api",

@@ -17,6 +17,7 @@ source lives next to this file and is imported first.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from typing import Optional
@@ -51,9 +52,47 @@ from builder.utils import process as _proc_mod  # type: ignore
 _proc_mod.check_command_exists = lambda cmd: _shutil.which(cmd) is not None  # type: ignore[assignment]
 
 # 2. build_dir lives under build/ at the project root. Generated hxml files
-#    colocate with profiles/main.json (the project-owned config cloned by
-#    gd-builder/enable.sh from templates/profiles/main.json).
+#    colocate with profiles/main.json; bootstrap or refresh default libs from
+#    gd-builder's project template.
 _ORIG_FROM_PROJECT_ROOT = ProjectConfig.from_project_root.__func__
+
+
+def _lib_name(lib: str) -> str:
+    return lib.split(":", 1)[0].strip()
+
+
+def _ensure_profile(profile: Path, template: Path) -> None:
+    if not template.exists():
+        return
+
+    if not profile.exists():
+        profile.write_text(template.read_text(encoding="utf-8"), encoding="utf-8")
+        return
+
+    try:
+        data = json.loads(profile.read_text(encoding="utf-8"))
+        defaults = json.loads(template.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return
+
+    libs = data.get("libs") if isinstance(data, dict) else None
+    default_libs = defaults.get("libs") if isinstance(defaults, dict) else None
+    if not isinstance(libs, list) or not isinstance(default_libs, list):
+        return
+
+    seen = {_lib_name(lib) for lib in libs if isinstance(lib, str)}
+    changed = False
+    for lib in default_libs:
+        if not isinstance(lib, str):
+            continue
+        name = _lib_name(lib)
+        if name and name not in seen:
+            libs.append(lib)
+            seen.add(name)
+            changed = True
+
+    if changed:
+        profile.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
 @classmethod
@@ -61,55 +100,32 @@ def _from_project_root_with_build_dir(cls, project_dir: Optional[Path] = None):
     config = _ORIG_FROM_PROJECT_ROOT(cls, project_dir)
     config.build_dir = config.project_dir / "build"
     config.build_dir.mkdir(parents=True, exist_ok=True)
-    (config.build_dir / "profiles").mkdir(parents=True, exist_ok=True)
+    profiles_dir = config.build_dir / "profiles"
+    profiles_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_profile(
+        profiles_dir / "main.json",
+        MODULE_DIR / "templates" / "profiles" / "main.json",
+    )
     return config
 
 
 ProjectConfig.from_project_root = _from_project_root_with_build_dir  # type: ignore[method-assign]
 
-# 3. Post-process generated hxml: apply libs from modules/build/profiles/main.json
-#    (gd-builder hardcodes `-lib heaps`) and append module-contributed macros.
+# 3. Post-process generated hxml: append module-contributed macros.
 from builder.services.haxe import HaxeCompiler as _HaxeCompiler  # type: ignore
 _ORIG_GENERATE_HXML = _HaxeCompiler.generate_hxml
 _I18N_MACRO_LINE = "--macro loc.text.macro.I18nValidator.scan()"
 
 
-def _load_profile_libs() -> list[str]:
-    import json
-    profile = ROOT / "build" / "profiles" / "main.json"
-    if not profile.exists():
-        return []
-    try:
-        return list(json.loads(profile.read_text()).get("libs", []))
-    except (ValueError, OSError):
-        return []
-
-
 def _generate_hxml_with_project_fixes(self, platform, mode):
     path = _ORIG_GENERATE_HXML(self, platform, mode)
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
+    if _I18N_MACRO_LINE in text:
+        return path
+
     lines = text.splitlines()
-
-    libs_from_profile = _load_profile_libs()
-    if libs_from_profile:
-        existing = {ln.strip() for ln in lines if ln.strip().startswith("-lib ")}
-        heaps_variant = next((l for l in libs_from_profile if l.split(":", 1)[0] == "heaps"), None)
-        if heaps_variant and heaps_variant != "heaps":
-            for i, ln in enumerate(lines):
-                if ln.strip() == "-lib heaps":
-                    lines[i] = f"-lib {heaps_variant}"
-                    existing.discard("-lib heaps")
-                    existing.add(f"-lib {heaps_variant}")
-        for lib in libs_from_profile:
-            ln = f"-lib {lib}"
-            if ln not in existing:
-                lines.append(ln)
-                existing.add(ln)
-
-    if _I18N_MACRO_LINE not in text:
-        lines.append(_I18N_MACRO_LINE)
-
-    path.write_text("\n".join(lines) + "\n")
+    lines.append(_I18N_MACRO_LINE)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
 
 

@@ -66,3 +66,32 @@ class TestHaxeCompiler:
         content = hxml_path.read_text()
         assert "-cp src" in content
         assert "testmodule" in content
+
+    def test_generate_hxml_includes_profile_and_module_libs(self, mock_config, temp_project_dir):
+        """Test hxml includes project profile libs and module-declared libs."""
+        profile_dir = temp_project_dir / "build" / "profiles"
+        profile_dir.mkdir(parents=True)
+        (profile_dir / "main.json").write_text(
+            '{"libs": ["heaps:git", "domkit"]}',
+            encoding="utf-8",
+        )
+
+        module_dir = temp_project_dir / "modules" / "testmodule"
+        module_dir.mkdir()
+        (module_dir / "module.json").write_text(
+            '{"libs": ["heaps", "deepnightLibs"]}',
+            encoding="utf-8",
+        )
+
+        compiler = HaxeCompiler(mock_config)
+        hxml_path = compiler.generate_hxml("web", "debug")
+
+        lib_lines = [
+            line for line in hxml_path.read_text().splitlines()
+            if line.startswith("-lib ")
+        ]
+        assert lib_lines == [
+            "-lib heaps:git",
+            "-lib domkit",
+            "-lib deepnightLibs",
+        ]

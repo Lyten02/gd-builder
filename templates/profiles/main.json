@@ -3,7 +3,7 @@
   "main": "Main",
   "sourcePaths": ["src"],
   "defines": ["antialiasing=4"],
-  "libs": ["heaps:git"],
+  "libs": ["heaps:git", "domkit", "deepnightLibs"],
   "autoDiscoverModules": false,
   "reactBuildRuntime": false
 }
