@@ -213,6 +213,7 @@ class HaxeCompiler:
         libs: list[str] = []
         seen: set[str] = set()
         _append_haxe_lib(libs, seen, "utest")
+        _append_haxe_lib(libs, seen, "hxnodejs")
         for lib in collect_haxe_libs(self.config):
             _append_haxe_lib(libs, seen, lib)
         for lib in libs:

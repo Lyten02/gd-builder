@@ -13,7 +13,7 @@ def _haxelib_package_name(lib: str) -> str:
 def _setup_haxe_libs(config: ProjectConfig) -> list[str]:
     libs: list[str] = []
     seen: set[str] = set()
-    for raw_lib in [*collect_haxe_libs(config), "utest"]:
+    for raw_lib in [*collect_haxe_libs(config), "utest", "hxnodejs"]:
         lib = _haxelib_package_name(raw_lib)
         if lib and lib not in seen:
             libs.append(lib)

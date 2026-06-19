@@ -125,6 +125,7 @@ class TestHaxeCompiler:
         assert f"-cp {str(builder_haxe.relative_to(temp_project_dir))}" in lines
         assert f"-cp {str((module_dir / 'test').relative_to(temp_project_dir))}" in lines
         assert "-lib utest" in lines
+        assert "-lib hxnodejs" in lines
         assert "-lib heaps:git" in lines
         assert "-lib domkit" in lines
         assert "-lib deepnightLibs" in lines
@@ -152,4 +153,5 @@ class TestHaxeCompiler:
             "domkit",
             "deepnightLibs",
             "utest",
+            "hxnodejs",
         ]

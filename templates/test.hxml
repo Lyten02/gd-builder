@@ -2,6 +2,7 @@
 -cp test
 -cp modules/gd-builder/haxe
 -lib utest
+-lib hxnodejs
 -lib heaps:git
 -main TestMain
 -js bin/test/test.js
